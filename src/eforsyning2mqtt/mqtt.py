@@ -11,6 +11,8 @@ class MQTTClient:
 
         self._logger = logging.getLogger("eforsyning2mqtt")
 
+        self._closed = False
+
         self._client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2
         )
@@ -43,30 +45,62 @@ class MQTTClient:
 
         full_topic = f"{self._cfg.topic}/{topic}"
 
-        self._client.publish(
+        info = self._client.publish(
             full_topic,
             str(payload),
             qos=1,
             retain=True,
         )
 
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+
+            self._logger.warning(
+                "Failed to publish %s (rc=%s)",
+                full_topic,
+                info.rc,
+            )
+
     def close(self):
 
-        self.publish("status", "offline")
+        if self._closed:
+            return
+
+        self._closed = True
+
+        try:
+            self.publish("status", "offline")
+        except Exception:
+            pass
 
         self._client.loop_stop()
 
         self._client.disconnect()
 
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
+    def _on_connect(
+        self,
+        client,
+        userdata,
+        flags,
+        reason_code,
+        properties,
+    ):
 
         self._logger.info("Connected to MQTT broker")
 
         self.publish("status", "online")
 
-    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
+    def _on_disconnect(
+        self,
+        client,
+        userdata,
+        flags,
+        reason_code,
+        properties,
+    ):
 
-        self._logger.warning(
-            "Disconnected from MQTT broker (%s)",
-            reason_code,
-        )
+        if not self._closed:
+
+            self._logger.warning(
+                "Disconnected from MQTT broker (%s)",
+                reason_code,
+            )

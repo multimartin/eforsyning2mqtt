@@ -14,16 +14,29 @@ class EForsyningClient:
             is_water_supply=False,
         )
 
+        self._authenticated = False
+
     def authenticate(self) -> bool:
-        return self._client.authenticate()
+
+        self._authenticated = self._client.authenticate()
+
+        return self._authenticated
+
+    @property
+    def authenticated(self) -> bool:
+
+        return self._authenticated
 
     def get_user(self):
+
         return self._client._get_ebrugerinfo()
 
     def get_installations(self):
+
         return self._client._get_installations()
 
     def get_latest_year(self):
+
         return self._client._get_latest_year()
 
     def get_latest(self):

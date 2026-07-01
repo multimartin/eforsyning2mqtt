@@ -8,6 +8,5 @@ services:
 
     restart: unless-stopped
 
-    volumes:
-
-      - ./config:/config
+    env_file:
+      - .env

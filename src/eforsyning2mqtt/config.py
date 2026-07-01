@@ -1,42 +1,42 @@
-from pathlib import Path
-import yaml
+import os
 
 from .exceptions import ConfigurationError
-from .models import *
+from .models import Config, EForsyningConfig, MQTTConfig, PollingConfig
 
 
-CONFIG_FILE = Path("/config/config.yaml")
+def _env(name: str, default: str | None = None) -> str:
+
+    value = os.getenv(name, default)
+
+    if value is None:
+        raise ConfigurationError(
+            f"Environment variable '{name}' is not defined."
+        )
+
+    return value
 
 
 def load_config() -> Config:
 
-    if not CONFIG_FILE.exists():
-        raise ConfigurationError(
-            f"Configuration file not found: {CONFIG_FILE}"
-        )
-
-    with CONFIG_FILE.open() as f:
-        cfg = yaml.safe_load(f)
-
     return Config(
 
         eforsyning=EForsyningConfig(
-            username=str(cfg["eforsyning"]["username"]),
-            password=str(cfg["eforsyning"]["password"]),
-            supplier_id=str(cfg["eforsyning"]["supplier_id"]),
+            username=_env("EFORSYNING_USERNAME"),
+            password=_env("EFORSYNING_PASSWORD"),
+            supplier_id=_env("EFORSYNING_SUPPLIER_ID"),
         ),
 
         mqtt=MQTTConfig(
-            host=str(cfg["mqtt"]["host"]),
-            port=int(cfg["mqtt"]["port"]),
-            username=str(cfg["mqtt"]["username"]),
-            password=str(cfg["mqtt"]["password"]),
-            topic=str(cfg["mqtt"]["topic"]),
+            host=_env("MQTT_HOST"),
+            port=int(_env("MQTT_PORT", "1883")),
+            username=_env("MQTT_USERNAME", ""),
+            password=_env("MQTT_PASSWORD", ""),
+            topic=_env("MQTT_TOPIC", "eforsyning"),
         ),
 
         polling=PollingConfig(
             interval_minutes=int(
-                cfg["polling"]["interval_minutes"]
+                _env("POLLING_INTERVAL", "60")
             )
         ),
     )

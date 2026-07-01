@@ -1,4 +1,5 @@
 import json
+import logging
 
 from eforsyning2mqtt.discovery import DiscoveryPublisher
 from eforsyning2mqtt.measurement import Measurement
@@ -10,6 +11,8 @@ class Publisher:
     def __init__(self, mqtt):
 
         self._mqtt = mqtt
+
+        self._logger = logging.getLogger("eforsyning2mqtt")
 
         self._discovery = DiscoveryPublisher(
             mqtt=mqtt,
@@ -28,19 +31,11 @@ class Publisher:
 
             topic = f"{prefix}/{key}" if prefix else key
 
-            #
-            # Nested dictionaries
-            #
-
             if isinstance(value, dict):
 
                 self._publish_dict(value, topic)
 
                 continue
-
-            #
-            # Lists
-            #
 
             if isinstance(value, list):
 
@@ -63,13 +58,18 @@ class Publisher:
 
                 continue
 
-            #
-            # Scalar values
-            #
-
             self._mqtt.publish(topic, value)
 
-            self._publish_discovery(topic)
+            try:
+
+                self._publish_discovery(topic)
+
+            except Exception:
+
+                self._logger.exception(
+                    "Discovery failed for topic %s",
+                    topic,
+                )
 
     def _publish_discovery(self, topic: str):
 

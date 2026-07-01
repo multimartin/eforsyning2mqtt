@@ -1,17 +1,40 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
+*.pyd
 
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Distribution
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local configuration
 .env
 
-config/config.yaml
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
 
-.vscode
-.idea
+# Type checking
+.mypy_cache/
 
-.pytest_cache
+# Ruff
+.ruff_cache/
 
-dist
-build
-
-*.egg-info
+# Logs
+*.log
