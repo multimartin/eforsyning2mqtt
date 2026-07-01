@@ -37,23 +37,25 @@ class EForsyningService:
 
                 self._logger.info("Downloading latest measurements...")
 
-                data = self._client.get_latest()
+                measurement = self._client.get_latest()
 
                 self._logger.info("Publishing MQTT topics...")
 
-                self._publisher.publish(data)
+                self._publisher.publish(measurement)
 
                 self._logger.info("Publishing completed")
 
             except Exception:
 
-                self._logger.exception(
-                    "Update failed"
-                )
+                self._logger.exception("Update failed")
 
             self._logger.info(
-                "Sleeping %d minutes",
+                "Sleeping %d minutes...",
                 self._cfg.polling.interval_minutes,
             )
 
             time.sleep(interval)
+
+    def stop(self):
+
+        self._mqtt.close()

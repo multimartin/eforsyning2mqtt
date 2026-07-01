@@ -1,84 +1,39 @@
-import json
+import logging
 
-from eforsyning2mqtt.discovery import DiscoveryPublisher
+from eforsyning2mqtt.config import load_config
+from eforsyning2mqtt.logging_config import configure_logging
+from eforsyning2mqtt.service import EForsyningService
+from eforsyning2mqtt.version import VERSION
 
 
-class Publisher:
+def main() -> None:
 
-    def __init__(self, mqtt):
+    configure_logging()
 
-        self._mqtt = mqtt
+    logger = logging.getLogger("eforsyning2mqtt")
 
-        self._discovery = DiscoveryPublisher(
-            mqtt=mqtt,
-            base_topic=mqtt._cfg.topic,
-        )
+    logger.info("--------------------------------")
+    logger.info("eforsyning2mqtt %s", VERSION)
+    logger.info("--------------------------------")
 
-        self._discovered = set()
+    config = load_config()
 
-    def publish(self, data: dict):
+    service = EForsyningService(config)
 
-        self._publish_dict(data)
+    try:
 
-    def _publish_dict(self, data: dict, prefix: str = ""):
+        service.run()
 
-        for key, value in data.items():
+    except KeyboardInterrupt:
 
-            topic = f"{prefix}/{key}" if prefix else key
+        logger.info("Stopping...")
 
-            if isinstance(value, dict):
+    finally:
 
-                self._publish_dict(value, topic)
+        service.stop()
 
-            elif isinstance(value, list):
+        logger.info("Shutdown complete")
 
-                self._mqtt.publish(
-                    topic,
-                    json.dumps(value),
-                )
 
-            else:
-
-                self._mqtt.publish(topic, value)
-
-                self._publish_discovery(topic, value)
-
-    def _publish_discovery(self, topic: str, value):
-
-        #
-        # Publish Home Assistant discovery only once
-        #
-
-        if topic in self._discovered:
-            return
-
-        self._discovered.add(topic)
-
-        unit = None
-        device_class = None
-        state_class = "measurement"
-
-        lower = topic.lower()
-
-        if "temp" in lower:
-            unit = "°C"
-            device_class = "temperature"
-
-        elif "kwh" in lower:
-            unit = "kWh"
-            device_class = "energy"
-
-        elif "m3" in lower:
-            unit = "m³"
-
-        elif "price" in lower:
-            unit = "DKK"
-
-        self._discovery.publish_sensor(
-            object_id=topic.replace("/", "_"),
-            name=topic.replace("/", " ").title(),
-            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
-            device_class=device_class,
-            state_class=state_class,
-            unit=unit,
-        )
+if __name__ == "__main__":
+    main()
