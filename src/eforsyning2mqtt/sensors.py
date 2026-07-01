@@ -1,79 +1,108 @@
-import logging
-import time
+"""
+Definitions of all MQTT/Home Assistant sensors.
+"""
 
-from eforsyning2mqtt.client import EForsyningClient
-from eforsyning2mqtt.config import load_config
-from eforsyning2mqtt.logging_config import configure_logging
-from eforsyning2mqtt.mqtt import MQTTClient
-from eforsyning2mqtt.publisher import Publisher
-from eforsyning2mqtt.version import VERSION
+SENSORS = {
 
+    #
+    # Temperatures
+    #
+    "temp-forward": {
+        "name": "Forward temperature",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "unit": "°C",
+        "icon": "mdi:thermometer-chevron-up",
+    },
 
-def main() -> None:
+    "temp-return": {
+        "name": "Return temperature",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "unit": "°C",
+        "icon": "mdi:thermometer-chevron-down",
+    },
 
-    configure_logging()
+    "temp-cooling": {
+        "name": "Cooling",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "unit": "°C",
+        "icon": "mdi:snowflake-thermometer",
+    },
 
-    logger = logging.getLogger("eforsyning2mqtt")
+    #
+    # Energy
+    #
+    "energy-used": {
+        "name": "Energy used",
+        "device_class": "energy",
+        "state_class": "total_increasing",
+        "unit": "kWh",
+        "icon": "mdi:lightning-bolt",
+    },
 
-    logger.info("--------------------------------")
-    logger.info("eforsyning2mqtt %s", VERSION)
-    logger.info("--------------------------------")
+    "energy-end": {
+        "name": "Energy total",
+        "device_class": "energy",
+        "state_class": "total",
+        "unit": "kWh",
+        "icon": "mdi:counter",
+    },
 
-    cfg = load_config()
+    "energy-use-prognosis": {
+        "name": "Energy forecast",
+        "device_class": "energy",
+        "state_class": "measurement",
+        "unit": "kWh",
+        "icon": "mdi:chart-line",
+    },
 
-    client = EForsyningClient(cfg)
+    #
+    # Water
+    #
+    "water-used": {
+        "name": "Water used",
+        "state_class": "measurement",
+        "unit": "m³",
+        "icon": "mdi:water",
+    },
 
-    mqtt = MQTTClient(cfg.mqtt)
+    "water-end": {
+        "name": "Water total",
+        "state_class": "total",
+        "unit": "m³",
+        "icon": "mdi:water",
+    },
 
-    publisher = Publisher(mqtt)
+    #
+    # Billing
+    #
+    "billing/Amount-Paid": {
+        "name": "Amount paid",
+        "state_class": "measurement",
+        "unit": "DKK",
+        "icon": "mdi:cash-check",
+    },
 
-    try:
+    "billing/Amount-Remaining": {
+        "name": "Amount remaining",
+        "state_class": "measurement",
+        "unit": "DKK",
+        "icon": "mdi:cash-minus",
+    },
 
-        logger.info("Connecting to eForsyning...")
+    "billing/MWh-Price": {
+        "name": "MWh price",
+        "state_class": "measurement",
+        "unit": "DKK",
+        "icon": "mdi:currency-usd",
+    },
 
-        if not client.authenticate():
-            logger.error("Authentication failed")
-            return
-
-        logger.info("Authentication OK")
-
-        interval = cfg.polling.interval_minutes * 60
-
-        while True:
-
-            try:
-
-                logger.info("Downloading measurements...")
-
-                data = client.get_latest()
-
-                logger.info("Publishing MQTT topics...")
-
-                publisher.publish(data)
-
-                logger.info("Publishing completed")
-
-            except Exception:
-
-                logger.exception("Update failed")
-
-            logger.info(
-                "Sleeping %d minutes...",
-                cfg.polling.interval_minutes,
-            )
-
-            time.sleep(interval)
-
-    except KeyboardInterrupt:
-
-        logger.info("Stopping...")
-
-    finally:
-
-        mqtt.close()
-
-        logger.info("Shutdown complete")
-
-
-if __name__ == "__main__":
-    main()
+    "billing/M3-Price": {
+        "name": "m³ price",
+        "state_class": "measurement",
+        "unit": "DKK",
+        "icon": "mdi:water",
+    },
+}
