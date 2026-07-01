@@ -1,4 +1,6 @@
 import logging
+import os
+import time
 
 from eforsyning2mqtt.client import EForsyningClient
 from eforsyning2mqtt.config import load_config
@@ -17,6 +19,7 @@ def main() -> None:
     logger.info("--------------------------------")
     logger.info("eforsyning2mqtt %s", VERSION)
     logger.info("--------------------------------")
+    logger.info("PID = %d", os.getpid())
 
     cfg = load_config()
 
@@ -60,8 +63,6 @@ def main() -> None:
                 "Sleeping %d minutes...",
                 cfg.polling.interval_minutes,
             )
-
-            import time
 
             time.sleep(interval)
 
