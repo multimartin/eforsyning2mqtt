@@ -37,7 +37,30 @@ def main() -> None:
 
     from pprint import pformat
 
-    logger.info(pformat(measurement.raw))
+    logger.info(
+    "Forward %.1f °C",
+    measurement.current.supply_temperature,
+    )
+
+    logger.info(
+        "Return %.1f °C",
+        measurement.current.return_temperature,
+    )
+
+    logger.info(
+        "Today's energy %.1f kWh",
+        measurement.current.energy_today,
+    )
+
+    logger.info(
+        "History contains %d days",
+        len(measurement.history),
+    )
+
+    logger.info(
+        "Amount paid %.2f DKK",
+        measurement.billing.amount_paid,
+    )
 
 if __name__ == "__main__":
     main()

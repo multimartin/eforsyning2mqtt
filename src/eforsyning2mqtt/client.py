@@ -27,4 +27,4 @@ class EForsyningClient:
 
         raw = self._client.get_latest()
 
-        return MeasurementMapper.from_api(raw)
+        return MeasurementMapper.from_api(data)
