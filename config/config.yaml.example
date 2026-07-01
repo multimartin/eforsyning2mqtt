@@ -1,0 +1,23 @@
+eforsyning:
+
+  username: ""
+
+  password: ""
+
+  supplier: ""
+
+mqtt:
+
+  host: 192.168.178.12
+
+  port: 1883
+
+  username: ""
+
+  password: ""
+
+  topic: eforsyning
+
+polling:
+
+  interval_minutes: 60

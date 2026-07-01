@@ -1,0 +1,13 @@
+services:
+
+  eforsyning2mqtt:
+
+    build: .
+
+    container_name: eforsyning2mqtt
+
+    restart: unless-stopped
+
+    volumes:
+
+      - ./config:/config
