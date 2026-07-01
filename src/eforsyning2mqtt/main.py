@@ -3,10 +3,41 @@ import logging
 from eforsyning2mqtt.client import EForsyningClient
 from eforsyning2mqtt.config import load_config
 from eforsyning2mqtt.logging_config import configure_logging
+from eforsyning2mqtt.mqtt import MQTTClient
 from eforsyning2mqtt.version import VERSION
 
 
-def main() -> None:
+def publish_measurements(mqtt: MQTTClient, data: dict):
+
+    mqtt.publish("raw", data)
+
+    mqtt.publish("temp-forward", data.get("temp-forward"))
+
+    mqtt.publish("temp-return", data.get("temp-return"))
+
+    mqtt.publish("temp-cooling", data.get("temp-cooling"))
+
+    mqtt.publish("energy-used", data.get("energy-used"))
+
+    mqtt.publish("energy-end", data.get("energy-end"))
+
+    mqtt.publish("energy-total-used", data.get("energy-total-used"))
+
+    mqtt.publish("energy-use-prognosis", data.get("energy-use-prognosis"))
+
+    mqtt.publish("water-used", data.get("water-used"))
+
+    mqtt.publish("water-end", data.get("water-end"))
+
+    mqtt.publish("billing", data.get("billing"))
+
+    mqtt.publish("history", data.get("data"))
+
+    mqtt.publish("year", data.get("year"))
+
+
+def main():
+
     configure_logging()
 
     logger = logging.getLogger("eforsyning2mqtt")
@@ -17,50 +48,30 @@ def main() -> None:
 
     cfg = load_config()
 
-    logger.info("Supplier ID : %s", cfg.eforsyning.supplier_id)
-    logger.info("MQTT Host   : %s", cfg.mqtt.host)
-    logger.info("Polling     : %d minutes", cfg.polling.interval_minutes)
-
-    client = EForsyningClient(cfg)
-
     logger.info("Connecting to eForsyning...")
 
-    if not client.authenticate():
+    ef = EForsyningClient(cfg)
+
+    if not ef.authenticate():
         logger.error("Authentication failed")
         return
 
-    logger.info("Authentication successful")
+    logger.info("Authentication OK")
 
-    measurement = client.update()
+    logger.info("Downloading measurements...")
 
-    logger.info("Measurement received")
+    data = ef.get_latest()
 
-    from pprint import pformat
+    logger.info("Connecting to MQTT...")
 
-    logger.info(
-    "Forward %.1f °C",
-    measurement.current.supply_temperature,
-    )
+    mqtt = MQTTClient(cfg.mqtt)
 
-    logger.info(
-        "Return %.1f °C",
-        measurement.current.return_temperature,
-    )
+    mqtt.publish_dict(data)
 
-    logger.info(
-        "Today's energy %.1f kWh",
-        measurement.current.energy_today,
-    )
+    mqtt.disconnect()
 
-    logger.info(
-        "History contains %d days",
-        len(measurement.history),
-    )
+    logger.info("Published successfully")
 
-    logger.info(
-        "Amount paid %.2f DKK",
-        measurement.billing.amount_paid,
-    )
 
 if __name__ == "__main__":
     main()

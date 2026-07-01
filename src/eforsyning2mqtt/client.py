@@ -1,11 +1,8 @@
-from .mapper import MeasurementMapper
 from .pyeforsyning.eforsyning import Eforsyning
 
 
 class EForsyningClient:
-
     def __init__(self, config):
-
         self._client = Eforsyning(
             username=config.eforsyning.username,
             password=config.eforsyning.password,
@@ -14,7 +11,7 @@ class EForsyningClient:
             is_water_supply=False,
         )
 
-    def authenticate(self):
+    def authenticate(self) -> bool:
         return self._client.authenticate()
 
     def get_user(self):
@@ -23,6 +20,8 @@ class EForsyningClient:
     def get_installations(self):
         return self._client._get_installations()
 
-    def update(self):
-        raw = self._client.get_latest()
-        return MeasurementMapper.from_api(raw)
+    def get_latest(self) -> dict:
+        """
+        Returnerer rådata direkte fra eForsyning.
+        """
+        return self._client.get_latest()
