@@ -1,14 +1,9 @@
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
-from .measurement import Measurement
 
-
-class MeasurementMapper:
-
-    @staticmethod
-    def from_api(data: dict) -> Measurement:
-
-        return Measurement(
-            timestamp=datetime.now(),
-            raw=data,
-        )
+@dataclass(slots=True)
+class Measurement:
+    timestamp: datetime
+    raw: dict[str, Any] = field(default_factory=dict)

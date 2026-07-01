@@ -24,7 +24,5 @@ class EForsyningClient:
         return self._client._get_installations()
 
     def update(self):
-
         raw = self._client.get_latest()
-
-        return MeasurementMapper.from_api(data)
+        return MeasurementMapper.from_api(raw)
