@@ -2,7 +2,10 @@ from .pyeforsyning.eforsyning import Eforsyning
 
 
 class EForsyningClient:
+    """Wrapper around the pyeforsyning library."""
+
     def __init__(self, config):
+
         self._client = Eforsyning(
             username=config.eforsyning.username,
             password=config.eforsyning.password,
@@ -14,14 +17,6 @@ class EForsyningClient:
     def authenticate(self) -> bool:
         return self._client.authenticate()
 
-    def get_user(self):
-        return self._client._get_ebrugerinfo()
-
-    def get_installations(self):
-        return self._client._get_installations()
-
     def get_latest(self) -> dict:
-        """
-        Returnerer rådata direkte fra eForsyning.
-        """
+        """Return the raw dictionary from pyeforsyning."""
         return self._client.get_latest()

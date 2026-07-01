@@ -4,39 +4,11 @@ from eforsyning2mqtt.client import EForsyningClient
 from eforsyning2mqtt.config import load_config
 from eforsyning2mqtt.logging_config import configure_logging
 from eforsyning2mqtt.mqtt import MQTTClient
+from eforsyning2mqtt.publisher import Publisher
 from eforsyning2mqtt.version import VERSION
 
 
-def publish_measurements(mqtt: MQTTClient, data: dict):
-
-    mqtt.publish("raw", data)
-
-    mqtt.publish("temp-forward", data.get("temp-forward"))
-
-    mqtt.publish("temp-return", data.get("temp-return"))
-
-    mqtt.publish("temp-cooling", data.get("temp-cooling"))
-
-    mqtt.publish("energy-used", data.get("energy-used"))
-
-    mqtt.publish("energy-end", data.get("energy-end"))
-
-    mqtt.publish("energy-total-used", data.get("energy-total-used"))
-
-    mqtt.publish("energy-use-prognosis", data.get("energy-use-prognosis"))
-
-    mqtt.publish("water-used", data.get("water-used"))
-
-    mqtt.publish("water-end", data.get("water-end"))
-
-    mqtt.publish("billing", data.get("billing"))
-
-    mqtt.publish("history", data.get("data"))
-
-    mqtt.publish("year", data.get("year"))
-
-
-def main():
+def main() -> None:
 
     configure_logging()
 
@@ -48,29 +20,60 @@ def main():
 
     cfg = load_config()
 
-    logger.info("Connecting to eForsyning...")
-
-    ef = EForsyningClient(cfg)
-
-    if not ef.authenticate():
-        logger.error("Authentication failed")
-        return
-
-    logger.info("Authentication OK")
-
-    logger.info("Downloading measurements...")
-
-    data = ef.get_latest()
-
-    logger.info("Connecting to MQTT...")
+    client = EForsyningClient(cfg)
 
     mqtt = MQTTClient(cfg.mqtt)
 
-    mqtt.publish_dict(data)
+    publisher = Publisher(mqtt)
 
-    mqtt.disconnect()
+    try:
 
-    logger.info("Published successfully")
+        logger.info("Connecting to eForsyning...")
+
+        if not client.authenticate():
+            logger.error("Authentication failed")
+            return
+
+        logger.info("Authentication OK")
+
+        interval = cfg.polling.interval_minutes * 60
+
+        while True:
+
+            try:
+
+                logger.info("Downloading measurements...")
+
+                data = client.get_latest()
+
+                logger.info("Publishing MQTT topics...")
+
+                publisher.publish(data)
+
+                logger.info("Publishing completed")
+
+            except Exception:
+
+                logger.exception("Update failed")
+
+            logger.info(
+                "Sleeping %d minutes...",
+                cfg.polling.interval_minutes,
+            )
+
+            import time
+
+            time.sleep(interval)
+
+    except KeyboardInterrupt:
+
+        logger.info("Stopping...")
+
+    finally:
+
+        mqtt.close()
+
+        logger.info("Shutdown complete")
 
 
 if __name__ == "__main__":

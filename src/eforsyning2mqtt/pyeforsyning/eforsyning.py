@@ -294,17 +294,32 @@ class Eforsyning:
  
         _LOGGER.debug(f"POST to API")
         result = None
+       
         try:
-            result = requests.post(self._api_server + post_billing_data_url,
-                                    data = json.dumps(data),
-                                    timeout = 10,
-                                    headers=headers
-                                )
-        except requests.exceptions.RequestException:
-            raise HTTPFailed(result.raise_for_status())
+            result = requests.post(
+                self._api_server + post_billing_data_url,
+                data=json.dumps(data),
+                timeout=30,
+                headers=headers,
+            )
 
-        _LOGGER.debug(f"Done getting billing details {result.status_code}") #, Body: {result.text}")
-        _LOGGER.debug(json.dumps(result.json(), sort_keys = False, indent = 4))
+        except requests.exceptions.Timeout:
+
+            _LOGGER.warning(
+                "Billing request timed out"
+            )
+
+            return {}
+
+        except requests.exceptions.RequestException as exc:
+
+            _LOGGER.warning(
+                "Billing request failed: %s",
+                exc,
+            )
+
+            return {}
+
         return result.json()
 
 

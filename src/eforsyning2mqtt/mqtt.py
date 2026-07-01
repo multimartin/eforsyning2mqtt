@@ -1,71 +1,72 @@
-import json
+import logging
 
 import paho.mqtt.client as mqtt
 
 
 class MQTTClient:
 
-    def __init__(self, config):
+    def __init__(self, cfg):
 
-        self._topic = config.topic.rstrip("/")
+        self._cfg = cfg
 
-        self._client = mqtt.Client()
+        self._logger = logging.getLogger("eforsyning2mqtt")
 
-        if config.username:
-
-            self._client.username_pw_set(
-                config.username,
-                config.password,
-            )
-
-        self._client.connect(
-            config.host,
-            config.port,
-            60,
+        self._client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2
         )
 
-    def publish(self, topic, payload):
+        if cfg.username:
+            self._client.username_pw_set(
+                cfg.username,
+                cfg.password,
+            )
 
-        if isinstance(payload, (dict, list)):
-            payload = json.dumps(payload)
+        self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
 
-        if payload is None:
-            payload = ""
-
-        self._client.publish(
-            f"{self._topic}/{topic}",
-            payload,
+        self._client.will_set(
+            f"{cfg.topic}/status",
+            "offline",
+            qos=1,
             retain=True,
         )
 
-    def publish_dict(self, data):
+        self._client.connect(
+            cfg.host,
+            cfg.port,
+            keepalive=60,
+        )
 
-        self._publish_recursive("", data)
+        self._client.loop_start()
 
-    def _publish_recursive(self, path, value):
+    def publish(self, topic: str, payload):
 
-        if isinstance(value, dict):
+        full_topic = f"{self._cfg.topic}/{topic}"
 
-            for key, val in value.items():
+        self._client.publish(
+            full_topic,
+            str(payload),
+            qos=1,
+            retain=True,
+        )
 
-                next_path = f"{path}/{key}" if path else key
+    def close(self):
 
-                self._publish_recursive(next_path, val)
+        self.publish("status", "offline")
 
-            return
-
-        if isinstance(value, list):
-
-            for index, val in enumerate(value):
-
-                next_path = f"{path}/{index}"
-
-                self._publish_recursive(next_path, val)
-
-            return
-
-        self.publish(path, value)
-
-    def disconnect(self):
+        self._client.loop_stop()
 
         self._client.disconnect()
+
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+
+        self._logger.info("Connected to MQTT broker")
+
+        self.publish("status", "online")
+
+    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
+
+        self._logger.warning(
+            "Disconnected from MQTT broker (%s)",
+            reason_code,
+        )
