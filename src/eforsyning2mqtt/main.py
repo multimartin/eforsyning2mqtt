@@ -1,73 +1,43 @@
 import logging
 
+from eforsyning2mqtt.client import EForsyningClient
 from eforsyning2mqtt.config import load_config
 from eforsyning2mqtt.logging_config import configure_logging
 from eforsyning2mqtt.version import VERSION
 
 
-def main():
-
+def main() -> None:
     configure_logging()
 
-    root = logging.getLogger()
-
     logger = logging.getLogger("eforsyning2mqtt")
-
-    logger.info("Root handlers: %d", len(root.handlers))
-
-    for h in root.handlers:
-
-
-    logger.info("Handler: %s", h)
-
-    logger = logging.getLogger("eforsyning2mqtt")
-
-    cfg = load_config()
-
-    logger.info("Username=%s (%s)", cfg.eforsyning.username, type(cfg.eforsyning.username).__name__,)
-    logger.info("SupplierID=%s", cfg.eforsyning.supplier_id)
-
-    from eforsyning2mqtt.client import EForsyningClient
 
     logger.info("--------------------------------")
     logger.info("eforsyning2mqtt %s", VERSION)
     logger.info("--------------------------------")
 
+    cfg = load_config()
+
     logger.info("Supplier ID : %s", cfg.eforsyning.supplier_id)
-
-    logger.info("MQTT host: %s", cfg.mqtt.host)
-
-    logger.info(
-        "Polling : %d minutes",
-        cfg.polling.interval_minutes,
-    )
+    logger.info("MQTT Host   : %s", cfg.mqtt.host)
+    logger.info("Polling     : %d minutes", cfg.polling.interval_minutes)
 
     client = EForsyningClient(cfg)
 
-    logger.info("Authenticating...")
+    logger.info("Connecting to eForsyning...")
 
-    ok = client.authenticate()
+    if not client.authenticate():
+        logger.error("Authentication failed")
+        return
 
-    logger.info("Authenticated = %s", ok)
+    logger.info("Authentication successful")
 
-    logger.info("Getting user...")
+    measurement = client.update()
 
-    user = client.get_user()
+    logger.info("Measurement received")
 
-    logger.info("User:")
-    logger.info(user)
+    from pprint import pformat
 
-    logger.info("Getting installations...")
-
-    installations = client.get_installations()
-
-    logger.info(installations)
-
-    logger.info("Getting latest year...")
-
-    year = client.get_latest_year()
-
-    logger.info("Latest year = %s", year)
+    logger.info(pformat(measurement.raw))
 
 if __name__ == "__main__":
     main()

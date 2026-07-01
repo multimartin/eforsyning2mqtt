@@ -1,3 +1,4 @@
+from .mapper import MeasurementMapper
 from .pyeforsyning.eforsyning import Eforsyning
 
 
@@ -19,11 +20,11 @@ class EForsyningClient:
     def get_user(self):
         return self._client._get_ebrugerinfo()
 
-    def get_user(self):
-        return self._client._get_ebrugerinfo()
-
     def get_installations(self):
         return self._client._get_installations()
 
-    def get_latest_year(self):
-        return self._client._get_latest_year()
+    def update(self):
+
+        raw = self._client.get_latest()
+
+        return MeasurementMapper.from_api(raw)
