@@ -1,8 +1,8 @@
-from .pyeforsyning.eforsyning import Eforsyning
+from eforsyning2mqtt.mapper import MeasurementMapper
+from eforsyning2mqtt.pyeforsyning.eforsyning import Eforsyning
 
 
 class EForsyningClient:
-    """Wrapper around the pyeforsyning library."""
 
     def __init__(self, config):
 
@@ -17,6 +17,20 @@ class EForsyningClient:
     def authenticate(self) -> bool:
         return self._client.authenticate()
 
-    def get_latest(self) -> dict:
-        """Return the raw dictionary from pyeforsyning."""
-        return self._client.get_latest()
+    def get_user(self):
+        return self._client._get_ebrugerinfo()
+
+    def get_installations(self):
+        return self._client._get_installations()
+
+    def get_latest_year(self):
+        return self._client._get_latest_year()
+
+    def get_latest(self):
+
+        raw = self._client.get_latest()
+
+        if raw is None:
+            return None
+
+        return MeasurementMapper.from_api(raw)

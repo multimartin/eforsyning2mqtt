@@ -1,73 +1,97 @@
 import json
-import logging
 
-from .mqtt import MQTTClient
+from eforsyning2mqtt.discovery import DiscoveryPublisher
+from eforsyning2mqtt.measurement import Measurement
+from eforsyning2mqtt.sensors import SENSORS
 
 
 class Publisher:
-    """
-    Generic recursive MQTT publisher.
 
-    Publishes only changed values.
-    """
-
-    def __init__(self, mqtt: MQTTClient):
+    def __init__(self, mqtt):
 
         self._mqtt = mqtt
 
-        self._logger = logging.getLogger("eforsyning2mqtt")
+        self._discovery = DiscoveryPublisher(
+            mqtt=mqtt,
+            base_topic=mqtt._cfg.topic,
+        )
 
-        self._last_values = {}
+        self._discovered = set()
 
-    def publish(self, data: dict):
+    def publish(self, measurement: Measurement):
 
-        self._publish("", data)
+        self._publish_dict(measurement.as_dict())
 
-    def _publish(self, path: str, value):
+    def _publish_dict(self, data: dict, prefix: str = ""):
 
-        if isinstance(value, dict):
+        for key, value in data.items():
 
-            for key, item in value.items():
+            topic = f"{prefix}/{key}" if prefix else key
 
-                next_path = f"{path}/{key}" if path else key
+            #
+            # Nested dictionaries
+            #
 
-                self._publish(next_path, item)
+            if isinstance(value, dict):
 
+                self._publish_dict(value, topic)
+
+                continue
+
+            #
+            # Lists
+            #
+
+            if isinstance(value, list):
+
+                self._mqtt.publish(
+                    topic,
+                    json.dumps(value),
+                )
+
+                self._mqtt.publish(
+                    f"{topic}/count",
+                    len(value),
+                )
+
+                if value:
+
+                    self._mqtt.publish(
+                        f"{topic}/last",
+                        json.dumps(value[-1]),
+                    )
+
+                continue
+
+            #
+            # Scalar values
+            #
+
+            self._mqtt.publish(topic, value)
+
+            self._publish_discovery(topic)
+
+    def _publish_discovery(self, topic: str):
+
+        if topic in self._discovered:
             return
 
-        if isinstance(value, list):
+        self._discovered.add(topic)
 
-            for index, item in enumerate(value):
+        sensor = SENSORS.get(
+            topic,
+            {
+                "name": topic,
+                "state_class": "measurement",
+            },
+        )
 
-                next_path = f"{path}/{index}"
-
-                self._publish(next_path, item)
-
-            return
-
-        if value is None:
-            value = ""
-
-        elif isinstance(value, bool):
-            value = "true" if value else "false"
-
-        elif isinstance(value, (dict, list)):
-            value = json.dumps(value)
-
-        else:
-            value = str(value)
-
-        previous = self._last_values.get(path)
-
-        if previous == value:
-            return
-
-        self._last_values[path] = value
-
-        self._mqtt.publish(path, value)
-
-        self._logger.debug(
-            "Published %s = %s",
-            path,
-            value,
+        self._discovery.publish_sensor(
+            object_id=topic.replace("/", "_"),
+            name=sensor["name"],
+            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
+            device_class=sensor.get("device_class"),
+            state_class=sensor.get("state_class"),
+            unit=sensor.get("unit"),
+            icon=sensor.get("icon"),
         )

@@ -1,81 +1,84 @@
-import logging
-import os
-import time
+import json
 
-from eforsyning2mqtt.client import EForsyningClient
-from eforsyning2mqtt.config import load_config
-from eforsyning2mqtt.logging_config import configure_logging
-from eforsyning2mqtt.mqtt import MQTTClient
-from eforsyning2mqtt.publisher import Publisher
-from eforsyning2mqtt.version import VERSION
+from eforsyning2mqtt.discovery import DiscoveryPublisher
 
 
-def main() -> None:
+class Publisher:
 
-    configure_logging()
+    def __init__(self, mqtt):
 
-    logger = logging.getLogger("eforsyning2mqtt")
+        self._mqtt = mqtt
 
-    logger.info("--------------------------------")
-    logger.info("eforsyning2mqtt %s", VERSION)
-    logger.info("--------------------------------")
-    logger.info("PID = %d", os.getpid())
+        self._discovery = DiscoveryPublisher(
+            mqtt=mqtt,
+            base_topic=mqtt._cfg.topic,
+        )
 
-    cfg = load_config()
+        self._discovered = set()
 
-    client = EForsyningClient(cfg)
+    def publish(self, data: dict):
 
-    mqtt = MQTTClient(cfg.mqtt)
+        self._publish_dict(data)
 
-    publisher = Publisher(mqtt)
+    def _publish_dict(self, data: dict, prefix: str = ""):
 
-    try:
+        for key, value in data.items():
 
-        logger.info("Connecting to eForsyning...")
+            topic = f"{prefix}/{key}" if prefix else key
 
-        if not client.authenticate():
-            logger.error("Authentication failed")
+            if isinstance(value, dict):
+
+                self._publish_dict(value, topic)
+
+            elif isinstance(value, list):
+
+                self._mqtt.publish(
+                    topic,
+                    json.dumps(value),
+                )
+
+            else:
+
+                self._mqtt.publish(topic, value)
+
+                self._publish_discovery(topic, value)
+
+    def _publish_discovery(self, topic: str, value):
+
+        #
+        # Publish Home Assistant discovery only once
+        #
+
+        if topic in self._discovered:
             return
 
-        logger.info("Authentication OK")
+        self._discovered.add(topic)
 
-        interval = cfg.polling.interval_minutes * 60
+        unit = None
+        device_class = None
+        state_class = "measurement"
 
-        while True:
+        lower = topic.lower()
 
-            try:
+        if "temp" in lower:
+            unit = "°C"
+            device_class = "temperature"
 
-                logger.info("Downloading measurements...")
+        elif "kwh" in lower:
+            unit = "kWh"
+            device_class = "energy"
 
-                data = client.get_latest()
+        elif "m3" in lower:
+            unit = "m³"
 
-                logger.info("Publishing MQTT topics...")
+        elif "price" in lower:
+            unit = "DKK"
 
-                publisher.publish(data)
-
-                logger.info("Publishing completed")
-
-            except Exception:
-
-                logger.exception("Update failed")
-
-            logger.info(
-                "Sleeping %d minutes...",
-                cfg.polling.interval_minutes,
-            )
-
-            time.sleep(interval)
-
-    except KeyboardInterrupt:
-
-        logger.info("Stopping...")
-
-    finally:
-
-        mqtt.close()
-
-        logger.info("Shutdown complete")
-
-
-if __name__ == "__main__":
-    main()
+        self._discovery.publish_sensor(
+            object_id=topic.replace("/", "_"),
+            name=topic.replace("/", " ").title(),
+            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
+            device_class=device_class,
+            state_class=state_class,
+            unit=unit,
+        )
