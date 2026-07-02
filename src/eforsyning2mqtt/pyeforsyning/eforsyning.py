@@ -45,18 +45,55 @@ class Eforsyning:
         self._latest_year_begin = ""
         self._latest_year_end = ""
         self._session = requests.Session()
+        # Default timeout for requests (seconds)
+        self._default_timeout = 10
+        # Number of attempts for transient errors
+        self._retry_attempts = 3
 
     #
     # Public API
     #
 
+    def _do_request(self, method, url, **kwargs):
+        """Internal helper to perform requests using the shared Session.
+
+        Adds default timeout, and retries on ConnectionError and Timeout.
+        """
+        timeout = kwargs.pop('timeout', self._default_timeout)
+        # Ensure headers/data/json can be passed through
+        last_exc = None
+        for attempt in range(1, self._retry_attempts + 1):
+            try:
+                if method == 'GET':
+                    return self._session.get(url, timeout=timeout, **kwargs)
+                if method == 'POST':
+                    return self._session.post(url, timeout=timeout, **kwargs)
+                raise ValueError(f"Unsupported method: {method}")
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+                last_exc = exc
+                _LOGGER.debug("Request %s %s failed on attempt %s/%s: %s", method, url, attempt, self._retry_attempts, exc)
+                # On last attempt, re-raise so callers can handle
+                if attempt == self._retry_attempts:
+                    raise
+            except requests.exceptions.RequestException:
+                # Other request exceptions should be propagated
+                raise
+
     def _get(self, url, **kwargs):
-        kwargs.setdefault("timeout", 10)
-        return self._get(url, **kwargs)
+        """Perform a GET request using the shared session.
+
+        Preserves kwargs semantics from requests. Default timeout applied.
+        """
+        kwargs.setdefault('timeout', self._default_timeout)
+        return self._do_request('GET', url, **kwargs)
 
     def _post(self, url, **kwargs):
-        kwargs.setdefault("timeout", 10)
-        return self._post(url, **kwargs)
+        """Perform a POST request using the shared session.
+
+        Preserves kwargs semantics from requests. Default timeout applied.
+        """
+        kwargs.setdefault('timeout', self._default_timeout)
+        return self._do_request('POST', url, **kwargs)
 
     def get_user(self):
         """Retrieve information about the authenticated user."""
