@@ -2,6 +2,8 @@ import logging
 import time
 import requests
 
+from eforsyning2mqtt import measurement
+
 from .client import EForsyningClient
 from .mqtt import MQTTClient
 from .publisher import Publisher
@@ -40,11 +42,13 @@ class EForsyningService:
 
                 measurement = self._client.get_latest()
 
-                self._logger.inf("Publishing MQTT topics")
+                self._logger.info("Returned from get_latest")
 
+                self._logger.info("Calling publisher.publish")   
+                   
                 self._publisher.publish(measurement)
 
-                self._logger.info("Update completed")
+                self._logger.info("Returned from publisher.publish")
 
             except (RuntimeError, LoginFailed, HTTPFailed, requests.exceptions.RequestException, OSError, ValueError) as exc:
                 # Log expected errors and continue loop; do not silently swallow unexpected errors
