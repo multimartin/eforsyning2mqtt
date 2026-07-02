@@ -41,21 +41,25 @@ class MQTTClient:
 
         self._client.loop_start()
 
+ 
     def publish(self, topic: str, payload: Any) -> None:
-        """Publish ``payload`` to ``topic`` under the configured base topic.
-
-        The payload is converted to string before sending.
-        """
 
         full_topic = f"{self._cfg.topic}/{topic}"
 
-        info = self._client.publish(full_topic, str(payload), qos=1, retain=True)
-
-        info.wait_for_publish()
+        info = self._client.publish(
+            full_topic,
+            str(payload),
+            qos=1,
+            retain=True,
+        )
 
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
-            self._logger.warning("Failed to publish %s (rc=%s)", full_topic, info.rc)
-
+            self._logger.warning(
+                "Failed to publish %s (rc=%s)",
+                full_topic,
+                info.rc,
+            )
+ 
     def close(self) -> None:
 
         if self._closed:
