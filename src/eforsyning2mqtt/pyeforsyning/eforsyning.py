@@ -5,7 +5,6 @@ from datetime import datetime
 from datetime import timedelta
 import json
 import requests
-import http
 import logging
 import hashlib
 
@@ -228,6 +227,7 @@ class Eforsyning:
 
         _LOGGER.debug(f"Response from API. Status: {result.status_code}, Body: {result.text}")
 
+        # Parse JSON once
         result_json = result.json()
         # Data looks like this:
         #{"Installationer":[
@@ -242,7 +242,6 @@ class Eforsyning:
         #   "Målertype":"<str>"
         #  }
         # ]}
-        result_json = result.json()
         installations = result_json['Installationer'][0]
         self._installation_id = str(installations['InstallationNr'])
         self._asset_id = str(installations['AktivNr'])
@@ -278,7 +277,6 @@ class Eforsyning:
         # "aarsmaerke_start":"01-01-2022",
         # "aarsmaerke_slut":"31-12-2022"
         #}
-        result_json = result.json()
         self._latest_year = int(result_json['aarsmaerke'])
         self._latest_year_begin = str(result_json['aarsmaerke_start'])
         self._latest_year_end = str(result_json['aarsmaerke_slut'])
