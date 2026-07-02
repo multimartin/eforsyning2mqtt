@@ -49,6 +49,8 @@ class Eforsyning:
         self._default_timeout = 10
         # Number of attempts for transient errors
         self._retry_attempts = 3
+        # Guard to avoid recursive re-auth attempts
+        self._reauth_in_progress = False
 
     #
     # Public API
@@ -69,15 +71,63 @@ class Eforsyning:
                 if method == 'POST':
                     return self._session.post(url, timeout=timeout, **kwargs)
                 raise ValueError(f"Unsupported method: {method}")
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
-                last_exc = exc
-                _LOGGER.debug("Request %s %s failed on attempt %s/%s: %s", method, url, attempt, self._retry_attempts, exc)
-                # On last attempt, re-raise so callers can handle
-                if attempt == self._retry_attempts:
-                    raise
-            except requests.exceptions.RequestException:
-                # Other request exceptions should be propagated
+            except requests.exceptions.RequestException as exc:
+                # If we received a response object (HTTP error), check for auth failures
+                response = getattr(exc, 'response', None)
+                # Also try to detect unauthorized responses when request succeeded
+                if response is None and attempt == 1:
+                    # Some servers return 401/403 as normal responses; attempt to fetch
+                    try:
+                        if method == 'GET':
+                            response = self._session.get(url, timeout=timeout, **kwargs)
+                        elif method == 'POST':
+                            response = self._session.post(url, timeout=timeout, **kwargs)
+                    except requests.exceptions.RequestException:
+                        response = None
+
+                if response is not None and response.status_code in (401, 403):
+                    # Session may be expired/invalid. Attempt re-auth once per request.
+                    if kwargs.pop('allow_reauth', True) and not self._reauth_in_progress:
+                        _LOGGER.info("Detected auth error (%s) on %s. Attempting automatic re-authentication.", response.status_code, url)
+                        try:
+                            self._reauth_in_progress = True
+                            # Perform full authentication sequence
+                            self._get_api_server()
+                            self._get_access_token()
+                            self._login()
+                            _LOGGER.info("Automatic re-authentication successful. Retrying original request once.")
+                        except Exception as err:
+                            _LOGGER.warning("Automatic re-authentication failed: %s", err)
+                            raise
+                        finally:
+                            self._reauth_in_progress = False
+
+                        # Retry original request once but prevent infinite re-auth loops
+                        try:
+                            kwargs.setdefault('timeout', timeout)
+                            kwargs['allow_reauth'] = False
+                            if method == 'GET':
+                                return self._session.get(url, timeout=timeout, **kwargs)
+                            if method == 'POST':
+                                return self._session.post(url, timeout=timeout, **kwargs)
+                        except requests.exceptions.RequestException:
+                            # If retry failed, bubble up original exception
+                            raise
+
+                # If it's a connection or timeout related exception, handle below
+                if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+                    last_exc = exc
+                    _LOGGER.debug("Request %s %s failed on attempt %s/%s: %s", method, url, attempt, self._retry_attempts, exc)
+                    # On last attempt, re-raise so callers can handle
+                    if attempt == self._retry_attempts:
+                        raise
+                    # otherwise continue to retry
+                    continue
+                # For other RequestException types, re-raise
                 raise
+        # If we exit the retry loop without returning, raise last exception if present
+        if last_exc:
+            raise last_exc
 
     def _get(self, url, **kwargs):
         """Perform a GET request using the shared session.
