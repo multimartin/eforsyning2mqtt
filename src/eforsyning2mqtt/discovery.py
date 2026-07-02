@@ -1,7 +1,17 @@
 import json
+from typing import Optional
 
 
 class DiscoveryPublisher:
+    """Publish Home Assistant discovery messages over MQTT.
+
+    Parameters
+    ----------
+    mqtt:
+        MQTT client wrapper exposing a ``publish(topic, payload)`` method.
+    base_topic:
+        Base topic used by the integration (not currently used directly).
+    """
 
     def __init__(self, mqtt, base_topic: str):
         self._mqtt = mqtt
@@ -12,20 +22,19 @@ class DiscoveryPublisher:
         object_id: str,
         name: str,
         state_topic: str,
-        device_class: str | None = None,
-        state_class: str | None = None,
-        unit: str | None = None,
-        icon: str | None = None,
-    ):
+        device_class: Optional[str] = None,
+        state_class: Optional[str] = None,
+        unit: Optional[str] = None,
+        icon: Optional[str] = None,
+    ) -> None:
+        """Publish a single sensor discovery payload."""
 
         payload = {
             "name": name,
             "unique_id": f"eforsyning_{object_id}",
             "state_topic": state_topic,
             "device": {
-                "identifiers": [
-                    "eforsyning"
-                ],
+                "identifiers": ["eforsyning"],
                 "name": "eForsyning",
                 "manufacturer": "eForsyning2MQTT",
                 "model": "Gateway",
@@ -44,12 +53,6 @@ class DiscoveryPublisher:
         if icon:
             payload["icon"] = icon
 
-        topic = (
-            "homeassistant/"
-            f"sensor/eforsyning/{object_id}/config"
-        )
+        topic = f"homeassistant/sensor/eforsyning/{object_id}/config"
 
-        self._mqtt.publish(
-            topic,
-            json.dumps(payload),
-        )
+        self._mqtt.publish(topic, json.dumps(payload))

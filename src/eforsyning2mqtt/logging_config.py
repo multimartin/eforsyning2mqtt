@@ -2,19 +2,13 @@ import logging
 
 
 def configure_logging(level: str = "INFO") -> None:
+    """Configure module-level logging for the application.
 
-    numeric_level = getattr(
-        logging,
-        level.upper(),
-        logging.INFO,
-    )
+    The default logger used by the project is ``eforsyning2mqtt``.
+    """
 
-    logging.basicConfig(
-        level=numeric_level,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    numeric_level = getattr(logging, level.upper(), logging.INFO)
 
-    logging.getLogger("eforsyning2mqtt").info(
-        "Logging initialized: %s",
-        logging.getLevelName(numeric_level),
-    )
+    logging.basicConfig(level=numeric_level, format="%(asctime)s %(levelname)s %(message)s")
+
+    logging.getLogger("eforsyning2mqtt").info("Logging initialized: %s", logging.getLevelName(numeric_level))
