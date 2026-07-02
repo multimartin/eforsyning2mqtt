@@ -4,6 +4,37 @@ from typing import Any
 
 
 @dataclass(slots=True)
+class EForsyningConfig:
+    username: str
+    password: str
+    supplier_id: str
+
+
+@dataclass(slots=True)
+class MQTTConfig:
+    host: str
+    port: int
+    username: str
+    password: str
+    topic: str
+
+
+@dataclass(slots=True)
+class PollingConfig:
+    interval_minutes: int
+
+
+@dataclass(slots=True)
+class Config:
+    eforsyning: EForsyningConfig
+    mqtt: MQTTConfig
+    polling: PollingConfig
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+
+@dataclass(slots=True)
 class CurrentMeasurement:
     supply_temperature: float = 0.0
     return_temperature: float = 0.0

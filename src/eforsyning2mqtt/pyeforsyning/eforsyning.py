@@ -8,7 +8,7 @@ import requests
 import logging
 import hashlib
 
-# Test
+# random is used to create session/correlation ids
 import random
 
 _LOGGER = logging.getLogger(__name__)
@@ -229,19 +229,7 @@ class Eforsyning:
 
         # Parse JSON once
         result_json = result.json()
-        # Data looks like this:
-        #{"Installationer":[
-        #  {"EjendomNr":<int>,
-        #   "Adresse":"<str>",
-        #   "InstallationNr":<int>,
-        #   "ForbrugerNr":"<int>",
-        #   "MålerNr":"<int>",
-        #   "By":"<str>",
-        #   "PostNr":"<int>",
-        #   "AktivNr":<int>,
-        #   "Målertype":"<str>"
-        #  }
-        # ]}
+    # Example response contains 'Installationer' with installation metadata
         installations = result_json['Installationer'][0]
         self._installation_id = str(installations['InstallationNr'])
         self._asset_id = str(installations['AktivNr'])
@@ -272,11 +260,7 @@ class Eforsyning:
         _LOGGER.debug(f"Response from API. Status: {result.status_code}, Body: {result.text}")
 
         result_json = result.json()
-        # Data looks like this:
-        #{"aarsmaerke":2022,
-        # "aarsmaerke_start":"01-01-2022",
-        # "aarsmaerke_slut":"31-12-2022"
-        #}
+    # Example response contains 'aarsmaerke' marker and start/end dates
         self._latest_year = int(result_json['aarsmaerke'])
         self._latest_year_begin = str(result_json['aarsmaerke_start'])
         self._latest_year_end = str(result_json['aarsmaerke_slut'])
