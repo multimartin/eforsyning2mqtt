@@ -1,4 +1,5 @@
 import logging
+import socket
 
 import paho.mqtt.client as mqtt
 
@@ -14,7 +15,8 @@ class MQTTClient:
         self._closed = False
 
         self._client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=f"eforsyning2mqtt-{socket.gethostname()}",
         )
 
         if cfg.username:
@@ -25,6 +27,11 @@ class MQTTClient:
 
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
+
+        self._client.reconnect_delay_set(
+            min_delay=1,
+            max_delay=60,
+        )
 
         self._client.will_set(
             f"{cfg.topic}/status",
@@ -51,6 +58,8 @@ class MQTTClient:
             qos=1,
             retain=True,
         )
+
+        info.wait_for_publish()
 
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
 

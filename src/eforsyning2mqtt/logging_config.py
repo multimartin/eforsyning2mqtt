@@ -1,25 +1,20 @@
 import logging
 
 
-def configure_logging() -> None:
+def configure_logging(level: str = "INFO") -> None:
 
-    root = logging.getLogger()
+    numeric_level = getattr(
+        logging,
+        level.upper(),
+        logging.INFO,
+    )
 
-    print("===== ROOT LOGGER =====")
-    print(f"Handlers before: {len(root.handlers)}")
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
-    for i, handler in enumerate(root.handlers):
-        print(f"Handler {i}: {handler!r}")
-
-    if not root.handlers:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s %(message)s",
-        )
-
-    print(f"Handlers after: {len(root.handlers)}")
-
-    for i, handler in enumerate(root.handlers):
-        print(f"Handler {i}: {handler!r}")
-
-    print("=======================")
+    logging.getLogger(__name__).info(
+        "Logging initialized (%s)",
+        logging.getLevelName(numeric_level),
+    )
