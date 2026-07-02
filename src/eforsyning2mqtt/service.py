@@ -36,11 +36,11 @@ class EForsyningService:
         while True:
 
             try:
-                self._logger.debug("Downloading latest measurements")
+                self._logger.info("Downloading latest measurements")
 
                 measurement = self._client.get_latest()
 
-                self._logger.debug("Publishing MQTT topics")
+                self._logger.inf("Publishing MQTT topics")
 
                 self._publisher.publish(measurement)
 
