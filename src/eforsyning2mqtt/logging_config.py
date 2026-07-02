@@ -14,7 +14,7 @@ def configure_logging(level: str = "INFO") -> None:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    logging.getLogger(__name__).info(
-        "Logging initialized (%s)",
+    logging.getLogger("eforsyning2mqtt").info(
+        "Logging initialized: %s",
         logging.getLevelName(numeric_level),
     )

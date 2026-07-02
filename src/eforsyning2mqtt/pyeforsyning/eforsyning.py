@@ -11,7 +11,7 @@ import hashlib
 # random is used to create session/correlation ids
 import random
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("eforsyning2mqtt")
 
 class LoginFailed(Exception):
     """"Exception class for bad credentials"""
@@ -87,14 +87,14 @@ class Eforsyning:
                 if response is not None and response.status_code in (401, 403):
                     # Session may be expired/invalid. Attempt re-auth once per request.
                     if kwargs.pop('allow_reauth', True) and not self._reauth_in_progress:
-                        _LOGGER.info("Detected auth error (%s) on %s. Attempting automatic re-authentication.", response.status_code, url)
+                        _LOGGER.debug("Detected auth error (%s) on %s. Attempting automatic re-authentication.", response.status_code, url)
                         try:
                             self._reauth_in_progress = True
                             # Perform full authentication sequence
                             self._get_api_server()
                             self._get_access_token()
                             self._login()
-                            _LOGGER.info("Automatic re-authentication successful. Retrying original request once.")
+                            _LOGGER.info("Automatic re-authentication successful")
                         except (LoginFailed, HTTPFailed, requests.exceptions.RequestException) as err:
                             # Log full stack trace for diagnostics and re-raise
                             _LOGGER.exception("Automatic re-authentication failed")

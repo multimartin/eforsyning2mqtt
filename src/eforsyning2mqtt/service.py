@@ -24,7 +24,7 @@ class EForsyningService:
 
     def run(self):
 
-        self._logger.info("Connecting to eForsyning...")
+        self._logger.info("Connecting to eForsyning")
 
         if not self._client.authenticate():
             raise RuntimeError("Authentication failed")
@@ -36,15 +36,15 @@ class EForsyningService:
         while True:
 
             try:
-                self._logger.info("Downloading latest measurements...")
+                self._logger.debug("Downloading latest measurements")
 
                 measurement = self._client.get_latest()
 
-                self._logger.info("Publishing MQTT topics...")
+                self._logger.debug("Publishing MQTT topics")
 
                 self._publisher.publish(measurement)
 
-                self._logger.info("Publishing completed")
+                self._logger.info("Update completed")
 
             except (RuntimeError, LoginFailed, HTTPFailed, requests.exceptions.RequestException, OSError, ValueError) as exc:
                 # Log expected errors and continue loop; do not silently swallow unexpected errors
