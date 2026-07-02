@@ -96,8 +96,9 @@ class Eforsyning:
                             self._get_access_token()
                             self._login()
                             _LOGGER.info("Automatic re-authentication successful. Retrying original request once.")
-                        except Exception as err:
-                            _LOGGER.warning("Automatic re-authentication failed: %s", err)
+                        except (LoginFailed, HTTPFailed, requests.exceptions.RequestException) as err:
+                            # Log full stack trace for diagnostics and re-raise
+                            _LOGGER.exception("Automatic re-authentication failed")
                             raise
                         finally:
                             self._reauth_in_progress = False

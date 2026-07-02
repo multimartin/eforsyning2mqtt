@@ -61,14 +61,13 @@ class Publisher:
             self._mqtt.publish(topic, value)
 
             try:
-
                 self._publish_discovery(topic)
-
-            except Exception:
-
+            except (KeyError, TypeError, ValueError, OSError) as exc:
+                # Log expected discovery/publish related errors with stack trace
                 self._logger.exception(
-                    "Discovery failed for topic %s",
+                    "Discovery failed for topic %s: %s",
                     topic,
+                    exc,
                 )
 
     def _publish_discovery(self, topic: str):

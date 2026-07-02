@@ -78,8 +78,9 @@ class MQTTClient:
 
         try:
             self.publish("status", "offline")
-        except Exception:
-            pass
+        except (OSError, RuntimeError) as exc:
+            # Publishing status failed; log and continue shutdown
+            self._logger.exception("Failed to publish offline status: %s", exc)
 
         self._client.loop_stop()
 

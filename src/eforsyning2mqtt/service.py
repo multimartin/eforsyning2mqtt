@@ -1,9 +1,11 @@
 import logging
 import time
+import requests
 
 from .client import EForsyningClient
 from .mqtt import MQTTClient
 from .publisher import Publisher
+from .pyeforsyning.eforsyning import LoginFailed, HTTPFailed
 
 
 class EForsyningService:
@@ -34,7 +36,6 @@ class EForsyningService:
         while True:
 
             try:
-
                 self._logger.info("Downloading latest measurements...")
 
                 measurement = self._client.get_latest()
@@ -45,9 +46,9 @@ class EForsyningService:
 
                 self._logger.info("Publishing completed")
 
-            except Exception:
-
-                self._logger.exception("Update failed")
+            except (RuntimeError, LoginFailed, HTTPFailed, requests.exceptions.RequestException, OSError, ValueError) as exc:
+                # Log expected errors and continue loop; do not silently swallow unexpected errors
+                self._logger.exception("Update failed: %s", exc)
 
             self._logger.info(
                 "Sleeping %d minutes...",
