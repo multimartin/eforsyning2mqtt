@@ -44,6 +44,7 @@ class Eforsyning:
         self._latest_year = 2000
         self._latest_year_begin = ""
         self._latest_year_end = ""
+        self._session = requests.Session()
 
     #
     # Public API
@@ -80,7 +81,7 @@ class Eforsyning:
         _LOGGER.debug(f"Getting userinfo from API (ebrugerinfo)")
         userinfoURL = self._api_server + "api/getebrugerinfo?id=" + self._access_token
         _LOGGER.debug(f"Trying: {userinfoURL}")
-        result = requests.get(userinfoURL,
+        result = self._session.get(userinfoURL,
                                 timeout = 5
                               )
         # Instead of converting with result.json() this is also possible:
@@ -123,7 +124,7 @@ class Eforsyning:
 
         headers = self._create_headers()
 
-        result = requests.post(installationsURL,
+        result = self._session.post(installationsURL,
                                 data = json.dumps(data),
                                 timeout = 10,
                                 headers=headers
@@ -168,7 +169,7 @@ class Eforsyning:
         _LOGGER.debug(f"Trying: {getaktuelaarsmaerkeURL}")
         headers = self._create_headers()
 
-        result = requests.post(getaktuelaarsmaerkeURL,
+        result = self._session.post(getaktuelaarsmaerkeURL,
                                 timeout = 10,
                                 headers=headers
                               )
@@ -287,7 +288,7 @@ class Eforsyning:
         _LOGGER.debug(f"POST data to API. {data}")
         result = None
         try:
-            result = requests.post(self._api_server + post_meter_data_url,
+            result = self._session.post(self._api_server + post_meter_data_url,
                                     data = json.dumps(data),
                                     timeout = 10,
                                     headers=headers
@@ -320,7 +321,7 @@ class Eforsyning:
         result = None
        
         try:
-            result = requests.post(
+            result = self._session.post(
                 self._api_server + post_billing_data_url,
                 data=json.dumps(data),
                 timeout=30,
@@ -353,7 +354,7 @@ class Eforsyning:
         settingsURL="umbraco/dff/dffapi/GetVaerkSettings?forsyningid="
         result = None
         try:
-            result = requests.get(self._base_url + settingsURL + self._supplierid, headers=self._create_headers())
+            result = self._session.get(self._base_url + settingsURL + self._supplierid, headers=self._create_headers())
         except requests.exceptions.RequestException:
             raise HTTPFailed(result.raise_for_status())
 
@@ -372,7 +373,7 @@ class Eforsyning:
 
         result = None
         try:
-            result = requests.get(security_token_url, headers=self._create_headers())
+            result = self._session.get(security_token_url, headers=self._create_headers())
         except requests.exceptions.RequestException as err:
             raise LoginFailed(f"Failure on HTTP request during access token aquisition: {err}")
             return False
@@ -397,7 +398,7 @@ class Eforsyning:
         auth_url = "system/login/project/app/consumer/"+self._username+"/installation/1/id/"
         result = None
         try:
-            result = requests.get(self._api_server + auth_url + self._access_token, headers=self._create_headers())
+            result = self._session.get(self._api_server + auth_url + self._access_token, headers=self._create_headers())
         except requests.exceptions.RequestException:
             raise HTTPFailed(result.raise_for_status())
 
