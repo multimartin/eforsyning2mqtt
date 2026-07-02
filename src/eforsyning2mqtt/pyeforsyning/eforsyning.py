@@ -518,17 +518,11 @@ class Eforsyning:
         Get latest data.
         '''
         _LOGGER.debug(f"Getting latest data")
-        _LOGGER.info("STEP 1")
         self._get_ebrugerinfo()
-        _LOGGER.info("STEP 2")
 
-        _LOGGER.info("STEP 3")
         self._get_installations()
-        _LOGGER.info("STEP 4")
 
-        _LOGGER.info("STEP 5")
         self._get_latest_year()
-        _LOGGER.info("STEP 6")
 
         # This is for heating data only - fetch yearly stats
         if self._is_water_supply == False:
@@ -537,9 +531,7 @@ class Eforsyning:
             years_to_fetch = min(self._latest_year - self._first_year, 5)
             start_year = self._latest_year - years_to_fetch
             for year_count in range(years_to_fetch + 1):
-                _LOGGER.info("STEP 7")
                 year_data = self._get_time_series(year=start_year + year_count)
-                _LOGGER.info("STEP 8")
                 result = self._parse_result_totals_line(year_data)
                 year_result.append(result)
 
@@ -575,12 +567,10 @@ class Eforsyning:
         # Try "invalid" year first if January and the year marker is not updated.
         _LOGGER.debug(f"{datetime.now().month} - {datetime.now().year} - {self._latest_year}")
         if datetime.now().month == 1 and datetime.now().year > self._latest_year:
-            _LOGGER.info("STEP 9")
             day_data = self._get_time_series(year=datetime.now().year,
                                             day=True, # NOTE: Pulling daily data is required to get non-averaged temperature measurements
                                             from_date=datetime.now()-timedelta(days=1),
                                             to_date=datetime.now())
-            _LOGGER.info("STEP 10")
             if 'response' in day_data or day_data['ForbrugsLinjer']['AntLinjer'] == "0":
                 _LOGGER.debug("Fetching new year data did not result in valid data.  Getting current dataset from %s", self._latest_year)
                 day_data = None
@@ -588,21 +578,17 @@ class Eforsyning:
         
         if day_data == None:
             # Fetch the daily use data using the API based yearly marker
-            _LOGGER.info("STEP 11")
             day_data = self._get_time_series(year=self._latest_year,
                                             day=True, # NOTE: Pulling daily data is required to get non-averaged temperature measurements
                                             from_date=datetime.now()-timedelta(days=1),
                                             to_date=datetime.now())
-            _LOGGER.info("STEP 12")
 
         # if there is a connection error, no data is returned, so don't try to parse it.
         if day_data:
             if self._is_water_supply == False:
                 result = self._parse_result_heating(day_data)
                 # Handle data from the billing
-                _LOGGER.info("STEP 13")
                 billing_data = self._get_billing_details()
-                _LOGGER.info("STEP 14")
                 billing_result = self._parse_result_billing(billing_data)
             else:
                 result = self._parse_result_water(day_data)

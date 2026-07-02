@@ -42,6 +42,9 @@ class MQTTClient:
         self._client.loop_start()
 
  
+    # Do not call info.wait_for_publish() here.
+    # The Paho client runs asynchronously via loop_start().
+    # Waiting can block the gateway indefinitely on some brokers.
     def publish(self, topic: str, payload: Any) -> None:
 
         full_topic = f"{self._cfg.topic}/{topic}"
