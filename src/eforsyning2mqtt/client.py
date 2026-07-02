@@ -27,19 +27,43 @@ class EForsyningClient:
 
         return self._authenticated
 
+    def _ensure_authenticated(self) -> None:
+
+        if self._authenticated:
+            return
+
+        if not self.authenticate():
+            raise RuntimeError(
+                "Authentication with eForsyning failed."
+            )
+
     def get_user(self):
 
-        return self._client._get_ebrugerinfo()
+        self._ensure_authenticated()
+
+        return self._client.get_user()
 
     def get_installations(self):
 
-        return self._client._get_installations()
+        self._ensure_authenticated()
+
+        return self._client.get_installations()
 
     def get_latest_year(self):
 
-        return self._client._get_latest_year()
+        self._ensure_authenticated()
+
+        return self._client.get_latest_year()
+
+    def get_billing(self):
+
+        self._ensure_authenticated()
+
+        return self._client.get_billing()
 
     def get_latest(self):
+
+        self._ensure_authenticated()
 
         raw = self._client.get_latest()
 

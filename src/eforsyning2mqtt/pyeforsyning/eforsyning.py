@@ -45,6 +45,30 @@ class Eforsyning:
         self._latest_year_begin = ""
         self._latest_year_end = ""
 
+    #
+    # Public API
+    #
+
+    def get_user(self):
+        """Retrieve information about the authenticated user."""
+        self._get_ebrugerinfo()
+        return {
+            "user_id": self._user_id,
+            "first_year": self._first_year,
+        }
+
+    def get_installations(self):
+        """Retrieve available installations."""
+        return self._get_installations()
+
+    def get_latest_year(self):
+        """Retrieve the current billing year."""
+        return self._get_latest_year()
+
+    def get_billing(self):
+        """Retrieve billing information."""
+        return self._get_billing_details()
+        
     def _get_ebrugerinfo(self):
         '''
         This method returns the "ebrugerid" which is different from the username.
