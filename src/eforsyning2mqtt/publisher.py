@@ -1,9 +1,11 @@
-"""MQTT publisher for measurement data and Home Assistant discovery.
+"""Publisher module for eforsyning2mqtt.
 
-This module provides a single ``Publisher`` class with a stable public API.
-It recursively publishes nested dictionaries, serializes lists as JSON and
-publishes helper topics ``<topic>/count`` and ``<topic>/last`` for lists.
-Home Assistant discovery publishing is delegated to ``DiscoveryPublisher``.
+This module implements a single ``Publisher`` class which exposes the same
+public API as the original implementation: ``Publisher(mqtt)`` and
+``publish(measurement)``. It recursively publishes nested dictionaries to
+MQTT topics, serializes lists as JSON and publishes helper topics
+``<topic>/count`` and ``<topic>/last``. Home Assistant discovery is published
+once per topic via ``DiscoveryPublisher``.
 """
 
 from __future__ import annotations
@@ -21,226 +23,111 @@ _LOGGER = logging.getLogger("eforsyning2mqtt")
 
 
 class Publisher:
-    """Publish measurement dictionaries to MQTT and send discovery payloads.
+    """Publish measurement data and discovery payloads to MQTT.
 
-    Public API:
-    - Publisher(mqtt)
-    - publish(measurement: Measurement) -> None
+    Public surface kept minimal and compatible with the previous API.
     """
 
     def __init__(self, mqtt: Any) -> None:
         self._mqtt = mqtt
         self._discovery = DiscoveryPublisher(mqtt=mqtt, base_topic=mqtt._cfg.topic)
-        self._discovered: set[str] = set()
+        self._published_discovery: set[str] = set()
 
     def publish(self, measurement: Measurement) -> None:
-        """Publish a Measurement object's dictionary to MQTT topics.
+        """Publish a Measurement to MQTT.
 
-        The measurement is expected to expose an ``as_dict()`` method that
-        returns a nested mapping of sensor names to values.
+        The measurement object must provide an ``as_dict()`` method returning
+        a nested mapping of keys to values. This method does not return a
+        value; errors are logged.
         """
-        data = measurement.as_dict()
-        self._publish_dict(data)
+        try:
+            data = measurement.as_dict()
+        except Exception:
+            _LOGGER.exception("Failed to obtain measurement dict from %r", measurement)
+            return
 
-    def _publish_dict(self, data: Dict[str, Any], prefix: str = "") -> None:
+        self._publish_map(data)
+
+    def _publish_map(self, data: Dict[str, Any], prefix: str = "") -> None:
         """Recursively publish mapping entries to MQTT topics.
 
-        - Nested dicts are flattened using ``prefix/key`` topic names.
-        - Lists are serialized as JSON and ``<topic>/count`` and
-          ``<topic>/last`` are published.
-        - For primitive values the value is published as-is.
-        - After publishing a primitive or list, discovery is attempted once
-          per unique topic.
+        - Nested dictionaries are traversed and published under ``prefix/key``.
+        - Lists are serialized as JSON and ``<topic>/count`` and ``<topic>/last``
+          are published.
+        - Primitive values are published directly.
+        - Discovery is attempted once per topic.
         """
         for key, value in data.items():
             topic = f"{prefix}/{key}" if prefix else key
 
+            # Nested mapping -> recurse
             if isinstance(value, dict):
-                self._publish_dict(value, topic)
+                self._publish_map(value, topic)
                 continue
 
+            # Lists -> JSON payload + helpers
             if isinstance(value, list):
+                payload = self._serialize(value)
                 try:
-                    payload = json.dumps(value)
-                except (TypeError, ValueError):
-                    # If list contains non-serializable items, fallback to str()
-                    payload = json.dumps([str(x) for x in value])
-
-                # Publish list payload
-                self._mqtt.publish(topic, payload)
-
-                # Publish helpers
-                self._mqtt.publish(f"{topic}/count", len(value))
-                if value:
-                    try:
-                        last_payload = json.dumps(value[-1])
-                    except (TypeError, ValueError):
-                        last_payload = str(value[-1])
-                    self._mqtt.publish(f"{topic}/last", last_payload)
-
-                # Attempt discovery for list topic
-                try:
-                    self._publish_discovery(topic)
+                    self._mqtt.publish(topic, payload)
                 except Exception:
-                    _LOGGER.exception("Discovery failed for topic %s", topic)
+                    _LOGGER.exception("Failed to publish list payload for %s", topic)
 
+                try:
+                    self._mqtt.publish(f"{topic}/count", len(value))
+                except Exception:
+                    _LOGGER.exception("Failed to publish count for %s", topic)
+
+                if value:
+                    last_payload = self._serialize(value[-1])
+                    try:
+                        self._mqtt.publish(f"{topic}/last", last_payload)
+                    except Exception:
+                        _LOGGER.exception("Failed to publish last element for %s", topic)
+
+                self._ensure_discovery(topic)
                 continue
 
-            # Primitive value publishing
+            # Primitive -> publish directly
             try:
                 self._mqtt.publish(topic, value)
             except Exception:
-                _LOGGER.exception("Failed to publish topic %s", topic)
+                _LOGGER.exception("Failed to publish value for %s", topic)
 
-            # Attempt discovery for primitive topic
-            try:
-                self._publish_discovery(topic)
-            except Exception:
-                _LOGGER.exception("Discovery failed for topic %s", topic)
+            self._ensure_discovery(topic)
 
-    def _publish_discovery(self, topic: str) -> None:
-        """Publish Home Assistant discovery for `topic` once.
+    def _serialize(self, obj: Any) -> str:
+        """Serialize an object to JSON safely, falling back to str()."""
+        try:
+            return json.dumps(obj)
+        except (TypeError, ValueError):
+            return json.dumps(str(obj))
 
-        Uses the `SENSORS` mapping to lookup metadata for the topic. If no
-        entry exists, a reasonable default is used.
+    def _ensure_discovery(self, topic: str) -> None:
+        """Publish discovery for `topic` only once.
+
+        Uses the global `SENSORS` mapping for metadata. Exceptions during
+        discovery publishing are logged but do not raise.
         """
-        if topic in self._discovered:
+        if topic in self._published_discovery:
             return
 
-        self._discovered.add(topic)
+        self._published_discovery.add(topic)
 
         sensor = SENSORS.get(topic, {"name": topic, "state_class": "measurement"})
 
-        self._discovery.publish_sensor(
-            object_id=topic.replace("/", "_"),
-            name=sensor.get("name", topic),
-            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
-            device_class=sensor.get("device_class"),
-            state_class=sensor.get("state_class"),
-            unit=sensor.get("unit"),
-            icon=sensor.get("icon"),
-        )
-import json
-import logging
-from typing import Any, Dict
-
-from eforsyning2mqtt.discovery import DiscoveryPublisher
-from eforsyning2mqtt.measurement import Measurement
-from eforsyning2mqtt.sensors import SENSORS
-
-
-class Publisher:
-    """Publish measurement data to MQTT topics and optionally publish discovery.
-
-    This implementation is instrumented with temporary INFO logs named STEP N
-    to help trace execution during debugging. Remove these logs after debugging.
-    """
-
-    def __init__(self, mqtt: Any) -> None:
-        self._mqtt = mqtt
-        self._logger = logging.getLogger("eforsyning2mqtt")
-        self._discovery = DiscoveryPublisher(mqtt=mqtt, base_topic=mqtt._cfg.topic)
-        self._discovered: set[str] = set()
-
-    def publish(self, measurement: Measurement) -> None:
-        """Publish an entire measurement object to MQTT.
-
-        Temporary STEP logs:
-        - STEP 1: entering publish()
-        - STEP 2: before delegating to _publish_dict
-        - STEP 99: returning from publish()
-        """
-        self._logger.info("STEP 1")
-        self._logger.info("STEP 2")
-        self._publish_dict(measurement.as_dict())
-        self._logger.info("STEP 99")
-
-    def _publish_dict(self, data: Dict[str, Any], prefix: str = "") -> None:
-        """Recursively publish a mapping of measurement keys to MQTT topics.
-
-        Instrumented temporary logs (sequential):
-        - STEP 10/11: at start/end of loop iteration
-        - STEP 20/21: before/after publishing a list
-        - STEP 30/31: before/after publishing a primitive value
-        - STEP 40/41: before/after attempting discovery publishing
-        """
-        for key, value in data.items():
-            self._logger.info("STEP 10")
-
-            topic = f"{prefix}/{key}" if prefix else key
-
-            if isinstance(value, dict):
-                # entering nested dict
-                self._logger.info("STEP 11")
-                self._publish_dict(value, topic)
-                self._logger.info("STEP 12")
-                continue
-
-            if isinstance(value, list):
-                self._logger.info("STEP 20")
-                # publish list as JSON
-                self._mqtt.publish(topic, json.dumps(value))
-                self._logger.info("STEP 21")
-
-                # publish count
-                self._logger.info("STEP 22")
-                self._mqtt.publish(f"{topic}/count", len(value))
-                self._logger.info("STEP 23")
-
-                # publish last element if present
-                if value:
-                    self._logger.info("STEP 24")
-                    self._mqtt.publish(f"{topic}/last", json.dumps(value[-1]))
-                    self._logger.info("STEP 25")
-                continue
-
-            # publish primitive value
-            self._logger.info("STEP 30")
-            self._mqtt.publish(topic, value)
-            self._logger.info("STEP 31")
-
-            # attempt discovery publishing for this topic
-            try:
-                self._logger.info("STEP 40")
-                self._publish_discovery(topic)
-                self._logger.info("STEP 41")
-            except (KeyError, TypeError, ValueError, OSError) as exc:
-                # Log expected discovery/publish related errors with stack trace
-                self._logger.exception("Discovery failed for topic %s: %s", topic, exc)
-
-        # end of _publish_dict
-        self._logger.info("STEP 50")
-
-    def _publish_discovery(self, topic: str) -> None:
-        """Publish Home Assistant discovery information for a topic once.
-
-        Instrumented with STEP logs:
-        - STEP 60: entering discovery publish
-        - STEP 61: discovery already done for topic (early return)
-        - STEP 62: after publishing discovery
-        """
-        self._logger.info("STEP 60")
-
-        if topic in self._discovered:
-            self._logger.info("STEP 61")
-            return
-
-        self._discovered.add(topic)
-
-        sensor = SENSORS.get(topic, {"name": topic, "state_class": "measurement"})
-
-        # publish discovery payload
-        self._discovery.publish_sensor(
-            object_id=topic.replace("/", "_"),
-            name=sensor["name"],
-            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
-            device_class=sensor.get("device_class"),
-            state_class=sensor.get("state_class"),
-            unit=sensor.get("unit"),
-            icon=sensor.get("icon"),
-        )
-
-        self._logger.info("STEP 62")
+        try:
+            self._discovery.publish_sensor(
+                object_id=topic.replace("/", "_"),
+                name=sensor.get("name", topic),
+                state_topic=f"{self._mqtt._cfg.topic}/{topic}",
+                device_class=sensor.get("device_class"),
+                state_class=sensor.get("state_class"),
+                unit=sensor.get("unit"),
+                icon=sensor.get("icon"),
+            )
+        except Exception:
+            _LOGGER.exception("Failed to publish discovery for %s", topic)
 import json
 import logging
 
@@ -292,77 +179,49 @@ class Publisher:
                     len(value),
                 )
 
-                import json
-                import logging
-                from typing import Any, Dict
+                if value:
 
-                from eforsyning2mqtt.discovery import DiscoveryPublisher
-                from eforsyning2mqtt.measurement import Measurement
-                from eforsyning2mqtt.sensors import SENSORS
+                    self._mqtt.publish(
+                        f"{topic}/last",
+                        json.dumps(value[-1]),
+                    )
 
+                continue
 
-                class Publisher:
-                    """Publish measurement data to MQTT topics and optionally publish discovery.
+            self._mqtt.publish(topic, value)
 
-                    The publisher serializes lists to JSON and provides summary topics like
-                    ``<topic>/count`` and ``<topic>/last`` for lists.
-                    """
+            try:
 
-                    def __init__(self, mqtt: Any) -> None:
-                        self._mqtt = mqtt
-                        self._logger = logging.getLogger("eforsyning2mqtt")
-                        self._discovery = DiscoveryPublisher(mqtt=mqtt, base_topic=mqtt._cfg.topic)
-                        self._discovered: set[str] = set()
+                self._publish_discovery(topic)
 
-                    def publish(self, measurement: Measurement) -> None:
-                        """Publish an entire measurement object to MQTT."""
-                        self._publish_dict(measurement.as_dict())
+            except Exception:
 
-                    def _publish_dict(self, data: Dict[str, Any], prefix: str = "") -> None:
-                        for key, value in data.items():
-                            topic = f"{prefix}/{key}" if prefix else key
+                self._logger.exception(
+                    "Discovery failed for topic %s",
+                    topic,
+                )
 
-                            if isinstance(value, dict):
-                                self._publish_dict(value, topic)
-                                continue
+    def _publish_discovery(self, topic: str):
 
-                            if isinstance(value, list):
-                                # publish list as JSON and provide count/last helpers
-                                self._mqtt.publish(topic, json.dumps(value))
-                                self._mqtt.publish(f"{topic}/count", len(value))
+        if topic in self._discovered:
+            return
 
-                                if value:
-                                    self._mqtt.publish(f"{topic}/last", json.dumps(value[-1]))
-                                continue
+        self._discovered.add(topic)
 
-                            # publish primitive value
-                            self._mqtt.publish(topic, value)
+        sensor = SENSORS.get(
+            topic,
+            {
+                "name": topic,
+                "state_class": "measurement",
+            },
+        )
 
-                            # attempt to publish discovery for this topic; log exceptions
-                            try:
-                                self._publish_discovery(topic)
-                            except (KeyError, TypeError, ValueError, OSError) as exc:
-                                self._logger.exception("Discovery failed for topic %s: %s", topic, exc)
-
-                    def _publish_discovery(self, topic: str) -> None:
-                        """Publish Home Assistant discovery information for a topic once.
-
-                        The SENSORS mapping can provide metadata (name, device_class, state_class,
-                        unit, icon). If no entry exists, a sensible default is used.
-                        """
-                        if topic in self._discovered:
-                            return
-
-                        self._discovered.add(topic)
-
-                        sensor = SENSORS.get(topic, {"name": topic, "state_class": "measurement"})
-
-                        self._discovery.publish_sensor(
-                            object_id=topic.replace("/", "_"),
-                            name=sensor["name"],
-                            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
-                            device_class=sensor.get("device_class"),
-                            state_class=sensor.get("state_class"),
-                            unit=sensor.get("unit"),
-                            icon=sensor.get("icon"),
-                        )
+        self._discovery.publish_sensor(
+            object_id=topic.replace("/", "_"),
+            name=sensor["name"],
+            state_topic=f"{self._mqtt._cfg.topic}/{topic}",
+            device_class=sensor.get("device_class"),
+            state_class=sensor.get("state_class"),
+            unit=sensor.get("unit"),
+            icon=sensor.get("icon"),
+        )
