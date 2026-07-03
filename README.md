@@ -85,6 +85,46 @@ docker compose up -d
 
 ---
 
+Credentials and Supplier ID
+
+To connect eforsyning2mqtt to your district heating supplier you need three values:
+
+Username
+Password
+Supplier ID
+Username and Password
+
+Use the same username and password that you normally use to log in to your district heating supplier's eForsyning website.
+
+Note
+
+Only the traditional username/password login is currently supported. Login methods such as MitID or other alternative authentication methods are not supported.
+
+Finding your Supplier ID
+
+The Supplier ID is not shown anywhere on the website, but it can easily be found using your browser's developer tools.
+
+Open the eForsyning website.
+If you are automatically redirected to your supplier's login page, click "Change supplier" (Skift forsyning) to return to the supplier selection page.
+Select your district heating supplier.
+Before logging in, press F12 to open your browser's Developer Tools.
+Select the Network tab.
+In the filter box, type:
+GetVaerkSettings
+Log in with your username and password.
+One network request named GetVaerkSettings will appear.
+Open the request and locate the URL, which looks similar to:
+https://<supplier>/umbraco/dff/dffapi/GetVaerkSettings?forsyningid=8c4b8d5d-xxxxxxxxxxxxxxxx
+Copy the value after forsyningid=.
+
+This value is your Supplier ID and should be configured together with your username and password.
+
+Example
+environment:
+  EFORSYNING_USERNAME: your_username
+  EFORSYNING_PASSWORD: your_password
+  EFORSYNING_SUPPLIER_ID: 8c4b8d5d-xxxxxxxxxxxxxxxx
+
 ## MQTT Topics
 
 Example
