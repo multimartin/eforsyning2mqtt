@@ -1,5 +1,8 @@
 from eforsyning2mqtt.mapper import MeasurementMapper
-from eforsyning2mqtt.pyeforsyning.eforsyning import Eforsyning
+from eforsyning2mqtt.pyeforsyning.eforsyning import (
+    Eforsyning,
+    LoginFailed,
+)
 
 
 class EForsyningClient:
@@ -37,35 +40,56 @@ class EForsyningClient:
                 "Authentication with eForsyning failed."
             )
 
-    def get_user(self):
+    def _call(self, func):
 
         self._ensure_authenticated()
 
-        return self._client.get_user()
+        try:
+
+            return func()
+
+        except LoginFailed:
+
+            #
+            # Session has most likely expired.
+            # Authenticate again and retry once.
+            #
+
+            self._authenticated = False
+
+            self._ensure_authenticated()
+
+            return func()
+
+    def get_user(self):
+
+        return self._call(
+            self._client.get_user
+        )
 
     def get_installations(self):
 
-        self._ensure_authenticated()
-
-        return self._client.get_installations()
+        return self._call(
+            self._client.get_installations
+        )
 
     def get_latest_year(self):
 
-        self._ensure_authenticated()
-
-        return self._client.get_latest_year()
+        return self._call(
+            self._client.get_latest_year
+        )
 
     def get_billing(self):
 
-        self._ensure_authenticated()
-
-        return self._client.get_billing()
+        return self._call(
+            self._client.get_billing
+        )
 
     def get_latest(self):
 
-        self._ensure_authenticated()
-
-        raw = self._client.get_latest()
+        raw = self._call(
+            self._client.get_latest
+        )
 
         if raw is None:
             return None

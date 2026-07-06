@@ -135,7 +135,10 @@ class Eforsyning:
         Preserves kwargs semantics from requests. Default timeout applied.
         """
         kwargs.setdefault('timeout', self._default_timeout)
-        return self._do_request('GET', url, **kwargs)
+        result = self._do_request('GET', url, **kwargs)
+        if result.status_code == 401:
+            raise LoginFailed("Session expired")
+        return result
 
     def _post(self, url, **kwargs):
         """Perform a POST request using the shared session.
@@ -143,7 +146,10 @@ class Eforsyning:
         Preserves kwargs semantics from requests. Default timeout applied.
         """
         kwargs.setdefault('timeout', self._default_timeout)
-        return self._do_request('POST', url, **kwargs)
+        result = self._do_request('POST', url, **kwargs)
+        if result.status_code == 401:
+            raise LoginFailed("Session expired")
+        return result
 
     def get_user(self):
         """Retrieve information about the authenticated user."""
@@ -182,14 +188,14 @@ class Eforsyning:
         # Instead of converting with result.json() this is also possible:
         #    euser_id = str(result_dict['id'])
 
+        if result.status_code != 200:
+            raise HTTPFailed(
+                f"HTTP {result.status_code}: {result.text}"
+            )
+
         result_json = result.json()
 
-        if result.status_code == 200:
-            _LOGGER.debug(f"Response from userinfo API. ebrugerinfo: {result.status_code}, Body: {result.text}, ebruger: {result_json['id']}")
-        else:
-            _LOGGER.error(f"Response from userinfo API. ebrugerinfo: {result.status_code}, Body: {result.text}")
-
-        self._user_id = result_json['id']
+        self._user_id = result_json["id"]
         self._first_year = datetime.strptime(result_json['indflyttet'], '%d-%m-%Y').year
 
     def _get_installations(self):
